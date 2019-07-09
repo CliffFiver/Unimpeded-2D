@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>U2D test</title>
+<meta name="Cache-Control" content="no-cache,no-store,must-revalidate,max-age=0"/>
+ <style>
+ .btn {
+ position:fixed;
+ width:10%; height:20%;
+ background-size:100% 100%;
+ }
+ .red {
+ background-image:url(exampleSource/btnRed.png);
+ }
+ .green {
+ background-image:url(exampleSource/btnGreen.png);
+ }
+.upG { left:10%; top:60%; }
+.downG { left:10%; top:80%; }
+.leftG { left:0%; top:70%; }
+.rightG { left:20%; top:70%; }
+ 
+.leftR { left:70%; top:70%; }
+.centerR { left:80%; top:70%; }
+.rightR { left:90%; top:70%; }
+ </style>
+</head>
+<body>
+      <!-- кнопки -->
+ <div class="btn green upG"></div>
+ <div class="btn green downG"></div>
+ <div class="btn green leftG"></div>
+ <div class="btn green rightG"></div>
+ 
+ <div class="btn red leftR"></div>
+ <div class="btn red centerR"></div>
+ <div class="btn red rightR"></div>
+</body>
+<script src="unimpeded2D_v1.js"></script>
+
+<script>
+ 
+  // Я думал будет проще и короче. Но совесть не позволяет не намудрить. Надеюсь что-нибудь понятно.
+  
+  var score=0, hitPoints=3;
+try{
+
+U2D.setFullscreen();
+U2D.setCameraDraggable();
+U2D.setFps(30);
+U2D.setResolution(500);
+U2D.setPinchZooming(4,10);
+U2D.setCameraZoom(6);
+
+ //загрузка ресурсов
+ 
+var f="exampleSource/";
+U2D.inputSource(f+"earth.png","earth")
+(f+"wall.jpg","wall")
+(f+"player.png","player")
+(f+"enemy.png","enemy")
+(f+"explodeSpritesheet.png","explode")
+(f+"bulletRed.png","pBullet")
+(f+"bulletBlue.png","eBullet")
+(f+"location.png","location")
+(f+"playerShoot.mp3","pShoot")
+(f+"explode1.mp3","explode1")
+(f+"explode2.mp3","explode2");
+
+ // анимация взрыва
+ 
+U2D.setSpritesheet("explode")({
+widthSteps:6,
+heightSteps:6,
+cadresAmount:34,
+playMultipler:4,
+});
+
+  //мини карта
+  
+U2D.setMiniMap({
+zoom:10,
+resolution:200,
+size:30,
+rotating:true,
+}); 
+
+  //локация
+
+var earth=new U2D.Tile()
+.setTexture("earth")
+.setMiniMapColor(125,60,0)
+.setColorId(255,255,255);
+
+var wall=new U2D.Tile()
+.setTexture("wall")
+.setCollideType("wall")
+.setMiniMapColor(50,50,50)
+.setColorId(0,0,0); 
+
+U2D.setBackgroundTile(wall);
+
+U2D.locationFromImage("location");
+
+   // сущности, с оберткой в функции тут удобнее
+   
+var player=new U2D.Entity()
+.setPosition(8,8)
+.setSize(0.5,0.6)
+.setAngle(0)
+.setTexture("player")
+.setCollideType("player")
+.setMiniMapIcon("player")
+.show()
+.setAction(playerProgress);
+ player.dirX=0;
+ player.dirY=0;
+ player.rotDir=0;
+ player.fireRate=0;
+ player.shooting=false;
+
+  function addEnemy(x,y){
+var enemy=new U2D.Entity()
+.setPosition(x,y)
+.setSize(0.6,0.5)
+.setAngle(0)
+.setTexture("enemy")
+.setCollideType("enemy")
+.setMiniMapIcon("enemy",true)
+.show()
+.setAction(enemyProgress);
+  enemy.hp=2;
+  enemy.fireRate=0;
+  enemy.dirX=-1+Math.random()*2;
+  enemy.dirY=-1+Math.random()*2;
+}
+
+
+ function addPlayerBullet(x,y,angle){
+new U2D.Entity()
+.setPosition(x,y)
+.setSize(0.2,0.2)
+.setAngle(angle)
+.setTexture("pBullet")
+.setCollideType("pBullet")
+.show()
+.setRemoveDelay(2)
+.setAction(function(e){ 
+e.polaricTranslate(e.getAngle(),0.15);
+ });
+}
+
+function addEnemyBullet(x,y,angle){
+new U2D.Entity()
+.setPosition(x,y)
+.setSize(0.2,0.2)
+.setAngle(angle)
+.setTexture("eBullet")
+.setCollideType("eBullet")
+.show()
+.setRemoveDelay(5)
+.setAction(function(e){ 
+e.polaricTranslate(e.getAngle(),0.08);
+ });
+}
+
+function addExplode(x,y){
+var explode=new U2D.Entity()
+.setPosition(x,y)
+.setSize(1.2,1.2)
+.setTexture("explode")
+.setRemoveDelay(1)
+.show();
+var snd=Math.random()<0.5?1:2;
+ new U2D.Sound("explode"+snd).playOnEntity(explode,10);
+}
+
+  // столкновения
+  
+U2D.setOnCollide("pBullet","wall")
+(function(bullet,wall){
+bullet.hide();
+});
+
+U2D.setOnCollide("eBullet","wall")
+(function(bullet,wall){
+bullet.hide();
+});
+
+U2D.setOnCollide("pBullet","enemy")
+(function(bullet,enemy){
+ bullet.hide(); 
+ enemy.hp-=1;
+ if(enemy.hp<=0){
+ score++;
+ addExplode(enemy.getX(), enemy.getY());
+enemy.hide(); 
+ enemyWaves();
+ } 
+});
+
+U2D.setOnCollide("enemy","wall")
+(function(enemy,wall){
+var spd=0.04;
+enemy.translatePosition(-enemy.dirX*2*spd,-enemy.dirY*2*spd);
+enemy.dirX=-1+Math.random()*2;
+enemy.dirY=-1+Math.random()*2;
+});
+
+U2D.setOnCollide("player","wall")
+(function(pl,wall){
+var spd=0.05;
+pl.polaricTranslate(pl.getAngle(),-pl.dirY*2*spd);
+pl.polaricTranslate(pl.getAngle()+90,-pl.dirX*2*spd);
+});
+
+U2D.setOnCollide("eBullet","player")
+(function(bullet,pl){
+bullet.hide();
+hitPoints-=1;
+ if(hitPoints<=0){
+ alert(score+" убийств");
+window.location.href=window.location.href;
+ }
+});
+
+
+  //другое
+  
+function playerProgress(e){  
+ var spd=0.05;
+e.polaricTranslate(e.getAngle()+90,e.dirX*spd);
+e.polaricTranslate(e.getAngle(),e.dirY*spd);
+e.bindCamera();
+e.setAngle(e.getAngle()+e.rotDir);
+U2D.setCameraAngle(-e.getAngle());
+ e.fireRate--;
+ if(e.fireRate<=0&&e.shooting){
+ e.fireRate=10;
+addPlayerBullet(e.getX(),e.getY(),e.getAngle());
+new U2D.Sound("pShoot").play();
+ }
+}
+
+function enemyProgress(e){
+//стрельба
+e.fireRate++;
+if(e.fireRate%30==0){
+addEnemyBullet(e.getX(),e.getY(),e.getAngle());
+}
+//движение
+e.angle=U2D.angleToPoint(e.getX(),e.getY(),U2D.getCameraX(),U2D.getCameraY());
+var spd=0.04;
+e.translatePosition(e.dirX*spd,e.dirY*spd);
+}
+
+ function spawnEnemyes(amount){
+//  все позиции земли далеко от игрока в массив
+var list=[];
+U2D.forEachTile(function(tile,x,y){
+var dist=U2D.distance(x,y,player.getX(),player.getY());
+ if(tile==earth&&dist>8){
+ list.push({X:x+0.5,Y:y+0.5});
+ }
+});
+for(var i=0;i<=amount;i++){
+//случайная позиция
+ var pos=list[Math.floor(Math.random()*(list.length-1))];
+addEnemy(pos.X,pos.Y);
+ }
+}
+ 
+ U2D.addOnLoad(function(){
+ setTimeout(function(){
+spawnEnemyes(10);
+ },3000);
+ });
+ 
+ function enemyWaves(){
+if(score==10){ spawnEnemyes(20); }
+if(score==30){ spawnEnemyes(30); }
+if(score==60){ 
+alert("игра пройдена"); }
+}
+
+  //управление
+  
+new U2D.Key("KeyW")
+.setOnPress(function(){
+player.dirY=1;
+})
+.setOnRelease(function(){
+player.dirY=0;
+});
+
+new U2D.Key("KeyS")
+.setOnPress(function(){
+player.dirY=-1;
+})
+.setOnRelease(function(){
+player.dirY=0;
+});
+
+new U2D.Key("KeyA")
+.setOnPress(function(){
+player.dirX=-1;
+})
+.setOnRelease(function(){
+player.dirX=0;
+});
+
+new U2D.Key("KeyD")
+.setOnPress(function(){
+player.dirX=1;
+})
+.setOnRelease(function(){
+player.dirX=0;
+});
+
+new U2D.Key("ArrowLeft")
+.setOnPress(function(){
+player.rotDir=1;
+})
+.setOnRelease(function(){
+player.rotDir=0;
+});
+
+new U2D.Key("ArrowUp")
+.setOnPress(function(){
+player.shooting=true
+})
+.setOnRelease(function(){
+player.shooting=false;
+});
+
+new U2D.Key("ArrowRight")
+.setOnPress(function(){
+player.rotDir=1;
+})
+.setOnRelease(function(){
+player.rotDir=0;
+});
+
+var btn=document.getElementsByClassName("btn")
+ 
+new U2D.Touch(btn[0])
+.setOnStart(function(){
+player.dirY=1;
+})
+.setOnEnd(function(){
+player.dirY=0;
+});
+
+new U2D.Touch(btn[1])
+.setOnStart(function(){
+player.dirY=-1;
+})
+.setOnEnd(function(){
+player.dirY=0;
+});
+
+new U2D.Touch(btn[2])
+.setOnStart(function(){
+player.dirX=-1;
+})
+.setOnEnd(function(){
+player.dirX=0;
+});
+
+new U2D.Touch(btn[3])
+.setOnStart(function(){
+player.dirX=1;
+})
+.setOnEnd(function(){
+player.dirX=0;
+});
+
+new U2D.Touch(btn[4])
+.setOnStart(function(){
+player.rotDir=-4;
+})
+.setOnEnd(function(){
+player.rotDir=0;
+});
+
+new U2D.Touch(btn[5])
+.setOnStart(function(){
+player.shooting=true;
+})
+.setOnEnd(function(){
+player.shooting=false;
+});
+
+new U2D.Touch(btn[6])
+.setOnStart(function(){
+player.rotDir=4;
+})
+.setOnEnd(function(){
+player.rotDir=0;
+});
+  
+
+if(!U2D.isMobile()){
+ while(btn[0]){
+btn[0].parentNode.removeChild(btn[0]);
+ }
+}
+
+  // запуск шарманки
+U2D.startRendering(); 
+
+
+}catch(e){ alert("main "+e); }
+
+
+
+
+</script>
+</html>
+
+
+
+
+
+
+
+
+

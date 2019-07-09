@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>editor test</title>
+<meta charset="utf-8">
+<meta name="Cache-Control" content="no-cache,no-store,must-revalidate,max-age=0"/>
+</head>
+<body></body>
+ <!-- connect U2D first -->
+<script src="unimpeded2D_v1.js"></script>
+<script>
+/* define tiles with color id and editor name, load last location (if you have it)*/
+  try{
+var f="exampleSource/";
+U2D.inputSource(f+"location.png","location")
+(f+"earth.png","earth")
+(f+"wall.jpg","wall")
+(f+"water.png","water");
+ 
+var t1=new U2D.Tile()
+.setTexture("earth")
+.setColorId(255,255,255)
+.setEditorName("earth");
+
+var t2=new U2D.Tile()
+.setTexture("water")
+.setColorId(0,0,255)
+.setEditorName("water");
+
+var t3=new U2D.Tile()
+.setTexture("wall")
+.setColorId(0,0,0)
+.setEditorName("wall");
+
+U2D.locationFromImage("location");
+
+// only for beauty
+U2D.setBackgroundTile(t2);
+
+ }catch(e){ alert(e); }
+</script>
+ <!-- connect editor in the end -->
+<script src="editor.js"></script>
+</html>
+
+
+
+
+
+
+
